@@ -217,6 +217,11 @@ commands:
         description: Directory containing package.json
         type: string
         default: ''
+      install-test-reporter:
+        description: |
+          Install packages required to generate JUnit test reports to enable showing a test summary in CircleCI. You can set to false if you are installing the necessary packages elsewhere or if you want to disable test reports.
+        type: boolean
+        default: true
     steps:
       - restore_cache:
           keys:
@@ -249,6 +254,15 @@ commands:
           name: 'Verify Cypress'
           command: << parameters.verify-command >>
           working_directory: << parameters.working_directory >>
+      - when:
+          condition: << parameters.install-test-reporter >>
+          steps:
+            - run:
+                name: 'Install Cypress Test Reporters'
+                working_directory: << parameters.working_directory >>
+                command: |
+                  sudo npm install -g cypress-multi-reporters mocha-junit-reporter
+                  sudo npm link cypress-multi-reporters mocha-junit-reporter
       # save new cache folder if needed
       - when:
           condition: << parameters.yarn >>
@@ -325,6 +339,11 @@ commands:
         description: Overrides the default NPM or Yarn command to verify Cypress
         type: string
         default: 'npx cypress verify'
+      install-test-reporter:
+        description: |
+          Install packages required to generate JUnit test reports to enable showing a test summary in CircleCI. You can set to false if you are installing the necessary packages elsewhere or if you want to disable test reports.
+        type: boolean
+        default: true
     steps:
       - setup:
           install-command: << parameters.install-command >>
@@ -334,6 +353,7 @@ commands:
           cache-key: << parameters.cache-key >>
           build: << parameters.build >>
           working_directory: << parameters.working_directory >>
+          install-test-reporter: << parameters.install-test-reporter >>
       - unless:
           condition: << parameters.no-workspace >>
           steps:
@@ -546,6 +566,12 @@ jobs:
         type: string
         default: ''
 
+      test-reports:
+        description: |
+          Generates and stores JUnit test reports to enable test summary, timing-based test splitting, and insights for CircleCI jobs. The default value will automatically produce and upload test results. Set this to the empty string if you do not want to upload test results, or to the directory containing test reports if you use a custom command that stores them in a different directory.
+        type: string
+        default: "cypress/results"
+
     executor: <<parameters.executor>>
     parallelism: <<parameters.parallelism>>
 
@@ -595,7 +621,9 @@ jobs:
                   - checkout
                   - steps: << parameters.post-checkout >>
                   - when:
-                      condition: << parameters.build >>
+                      condition: << parameters.test-reports>>
+                      # we need to pass a different boolean to install-test-reporter depending on whether the
+                      # test-reports string is truthy, and there isn't a way to cast it
                       steps:
                         - install:
                             yarn: << parameters.yarn >>
@@ -604,19 +632,22 @@ jobs:
                             post-install: << parameters.post-install >>
                             cache-key: << parameters.cache-key >>
                             no-workspace: << parameters.no-workspace >>
-                            build: << parameters.build >>
+                            build: << parameters.build >> # this may not be set but has the same default here and in the install command
                             working_directory: << parameters.working_directory >>
+                            install-test-reporter: true
                   - unless:
-                      condition: <<parameters.build>>
+                      condition: <<parameters.test-reports>>
                       steps:
                         - install:
-                            cache-key: << parameters.cache-key >>
                             yarn: << parameters.yarn >>
                             install-command: << parameters.install-command >>
                             verify-command: << parameters.verify-command >>
                             post-install: << parameters.post-install >>
+                            cache-key: << parameters.cache-key >>
                             no-workspace: << parameters.no-workspace >>
+                            build: << parameters.build >> # this may not be set but has the same default here and in the install command
                             working_directory: << parameters.working_directory >>
+                            install-test-reporter: false
 
       - when:
           condition: <<parameters.start>>
@@ -654,6 +685,7 @@ jobs:
                       no_output_timeout: <<parameters.timeout>>
                       # GOOD EXAMPLE conditional text based on boolean parameter
                       # --record is needed to pass many other arguments, like "--group" and "--parallel"
+                      # TODO: can we just default command-prefix to npx and avoid the big branching thing?
                       command: |
                         <<parameters.command-prefix>> cypress run \
                           <<# parameters.spec>> --spec '<<parameters.spec>>' <</ parameters.spec>> \
@@ -667,6 +699,10 @@ jobs:
                             <<# parameters.tags>> --tag '<<parameters.tags>>' <</ parameters.tags>> \
                             <<# parameters.ci-build-id>> --ci-build-id <<parameters.ci-build-id>> <</ parameters.ci-build-id>> \
                           <</ parameters.record>>
+                          <<# parameters.test-reports>> --reporter "../node_modules/cypress-multi-reporters" \
+                             --reporter-options '{"reporterEnabled":"spec, mocha-junit-reporter","mochaJunitReporterReporterOptions":{"mochaFile":"<< parameters.test-reports >>/results-[hash].xml"}}'
+                          <</ parameters.test-reports>>
+
                       working_directory: << parameters.working_directory >>
             - unless:
                 condition: <<parameters.command-prefix>>
@@ -689,6 +725,9 @@ jobs:
                             <<# parameters.tags>> --tag '<<parameters.tags>>' <</ parameters.tags>> \
                             <<# parameters.ci-build-id>> --ci-build-id <<parameters.ci-build-id>> <</ parameters.ci-build-id>> \
                           <</ parameters.record>>
+                          <<# parameters.test-reports>> --reporter "../node_modules/cypress-multi-reporters" \
+                             --reporter-options '{"reporterEnabled":"spec, mocha-junit-reporter","mochaJunitReporterReporterOptions":{"mochaFile":"<< parameters.test-reports >>/results-[hash].xml"}}'
+                          <</ parameters.test-reports>>
                       working_directory: << parameters.working_directory >>
 
       - when:
@@ -713,6 +752,11 @@ jobs:
                       path: cypress/videos
                   - store_artifacts:
                       path: cypress/screenshots
+      - when:
+          condition: << parameters.test-reports >>
+          steps:
+            - store_test_results:
+                path: << parameters.test-reports >>
 
   # Install Job that can be performed before running jobs
   # often used to have a single installation step, and then
@@ -762,6 +806,11 @@ jobs:
           appropriate checksum. (i.e. `cache-key: 'cache-{{ arch }}-{{ .Branch }}-{{ checksum "frontend/package.json" }}'`)
         type: string
         default: ''
+      install-test-reporter:
+        description: |
+          Install packages required to generate JUnit test reports to enable showing a test summary in CircleCI. You can set to false if you are installing the necessary packages elsewhere or if you want to disable test reports.
+        type: boolean
+        default: true
     description: |
       Checks out code, installs dependencies, attaches code to the workspace for the future jobs
       to use (usually `cypress/run` follows the install step).
@@ -773,27 +822,15 @@ jobs:
     steps:
       - checkout
       - steps: << parameters.post-checkout >>
-      - when:
-          condition: << parameters.build >>
-          steps:
-            - install:
-                install-command: << parameters.install-command >>
-                verify-command: << parameters.verify-command >>
-                yarn: << parameters.yarn >>
-                post-install: << parameters.post-install >>
-                build: << parameters.build >>
-                working_directory: << parameters.working_directory >>
-                cache-key: << parameters.cache-key >>
-      - unless:
-          condition: << parameters.build >>
-          steps:
-            - install:
-                install-command: << parameters.install-command >>
-                verify-command: << parameters.verify-command >>
-                yarn: << parameters.yarn >>
-                post-install: << parameters.post-install >>
-                working_directory: << parameters.working_directory >>
-                cache-key: << parameters.cache-key >>
+      - install:
+          install-command: << parameters.install-command >>
+          verify-command: << parameters.verify-command >>
+          yarn: << parameters.yarn >>
+          post-install: << parameters.post-install >>
+          build: << parameters.build >>
+          working_directory: << parameters.working_directory >>
+          cache-key: << parameters.cache-key >>
+          install-test-reporter: << parameters.install-test-reporter >>
 
 #
 # User examples showing how to use the above Cypress Orb
@@ -801,7 +838,7 @@ jobs:
 examples:
   simple:
     description: |
-      Runs all Cypress tests without recording results on the Dashboard.
+      Runs all Cypress tests and uploads test results for the tests tab.
       Installs dependencies with "npm ci", caches NPM modules and Cypress binary.
     usage:
       version: 2.1
@@ -1146,7 +1183,7 @@ examples:
       If you want to run an entire job after running Cypress tests, you can
       reuse the workspace from the `cypress/run` job. For example,
       to run a semantic release script you could follow this example.
-      Note - for simpler steps you can use "post-steps" parameter, see [store-test-reports](#store-test-reports) example.
+      Note - for simpler steps you can use "post-steps" parameter, see [any-artifacts](#any-artifacts) example.
     usage:
       version: 2.1
       orbs:
@@ -1215,10 +1252,13 @@ examples:
                 executor: with-chrome
                 browser: chrome
 
-  store-test-reports:
+  store-test-reports-with-custom-location:
     description: |
-      Stores test results using post-steps parameter, see https://on.cypress.io/reporters,
-      assumes that reports are saved in folder "cypress/results". Also see [artifacts](#artifacts) parameter.
+      Normally test reports get automatically created and uploaded. If you use a custom command that
+      produces test reports, you can either configure it to store the files in cypress/results or you can
+      use the test-reports parameter to Stores test results using post-steps parameter, see
+      https://on.cypress.io/reporters, assumes that reports are saved in folder "cypress/results". Also see
+      [artifacts](#artifacts) parameter.
     usage:
       version: 2.1
       orbs:
@@ -1231,6 +1271,22 @@ examples:
                 post-steps:
                   - store_test_results:
                       path: cypress/results
+
+  skip-test-reports:
+    description: |
+      You can skip producing and uploading test reports. This is useful if you have configured this yourself.
+    usage:
+      version: 2.1
+      orbs:
+        cypress: cypress-io/cypress@1
+
+      workflows:
+        build:
+          jobs:
+            - cypress/install:
+                install-test-reporter: false
+            - cypress/run:
+                test-reports: ""
 
   env-vars:
     description: |

@@ -32,7 +32,9 @@ const exampleTitles = {
   'custom-executor': 'use custom executor',
   'env-vars': 'set additional environment variables',
   'install-private-npm-modules': 'install private NPM dependencies',
-  'store-test-reports': 'store test reports on Circle',
+  'store-test-reports-with-custom-location':
+    'specify a different directory containing test reports for Circle',
+  'skip-test-reports': 'do not automatically produce and upload test results',
   artifacts: 'store screenshots and videos on Circle',
   'any-artifacts': 'store other folders as artifacts on Circle',
   'custom-command': 'use a custom command to launch tests',

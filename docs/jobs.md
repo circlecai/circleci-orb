@@ -34,6 +34,7 @@ Public jobs defined in this orb that your config workflow can use. See [examples
      - config-file
      - config
      - env
+     - test-reports
     
  - [install](#install)
      - executor
@@ -45,6 +46,7 @@ Public jobs defined in this orb that your config workflow can use. See [examples
      - install-command
      - verify-command
      - working_directory
+     - install-test-reporter
     
 
 ## run
@@ -292,6 +294,17 @@ default: `false`
 type: string
 
 
+**`test-reports`**
+
+> Generates and stores JUnit test reports to enable test summary, timing-based test splitting, and insights for CircleCI jobs. The default value will automatically produce and upload test results. Set this to the empty string if you do not want to upload test results, or to the directory containing test reports if you use a custom command that stores them in a different directory.
+
+
+type: string
+
+
+default: `cypress/results`
+
+
 **`timeout`**
 
 > Optional timeout for running tests
@@ -386,6 +399,17 @@ default: `base-12`
 
 
 type: string
+
+
+**`install-test-reporter`**
+
+> Install packages required to generate JUnit test reports to enable showing a test summary in CircleCI. You can set to false if you are installing the necessary packages elsewhere or if you want to disable test reports.
+
+
+type: boolean
+
+
+default: `true`
 
 
 **`post-checkout`**

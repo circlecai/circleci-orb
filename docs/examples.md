@@ -19,7 +19,8 @@
  - [custom-executor](#custom-executor) - use custom executor
  - [env-vars](#env-vars) - set additional environment variables
  - [install-private-npm-modules](#install-private-npm-modules) - install private NPM dependencies
- - [store-test-reports](#store-test-reports) - store test reports on Circle
+ - [store-test-reports-with-custom-location](#store-test-reports-with-custom-location) - specify a different directory containing test reports for Circle
+ - [skip-test-reports](#skip-test-reports) - do not automatically produce and upload test results
  - [artifacts](#artifacts) - store screenshots and videos on Circle
  - [any-artifacts](#any-artifacts) - store other folders as artifacts on Circle
  - [custom-command](#custom-command) - use a custom command to launch tests
@@ -43,7 +44,7 @@
 ## simple
 
 
-Runs all Cypress tests without recording results on the Dashboard. Installs dependencies with "npm ci", caches NPM modules and Cypress binary. 
+Runs all Cypress tests and uploads test results for the tests tab. Installs dependencies with "npm ci", caches NPM modules and Cypress binary. 
 
 ```yaml
 version: 2.1
@@ -288,7 +289,7 @@ workflows:
 ## release
 
 
-If you want to run an entire job after running Cypress tests, you can reuse the workspace from the `cypress/run` job. For example, to run a semantic release script you could follow this example. Note - for simpler steps you can use "post-steps" parameter, see [store-test-reports](#store-test-reports) example. 
+If you want to run an entire job after running Cypress tests, you can reuse the workspace from the `cypress/run` job. For example, to run a semantic release script you could follow this example. Note - for simpler steps you can use "post-steps" parameter, see [any-artifacts](#any-artifacts) example. 
 
 ```yaml
 version: 2.1
@@ -400,10 +401,10 @@ workflows:
             - cypress/install
 ```
 
-## store-test-reports
+## store-test-reports-with-custom-location
 
 
-Stores test results using post-steps parameter, see https://on.cypress.io/reporters, assumes that reports are saved in folder "cypress/results". Also see [artifacts](#artifacts) parameter. 
+Normally test reports get automatically created and uploaded. If you use a custom command that produces test reports, you can either configure it to store the files in cypress/results or you can use the test-reports parameter to Stores test results using post-steps parameter, see https://on.cypress.io/reporters, assumes that reports are saved in folder "cypress/results". Also see [artifacts](#artifacts) parameter. 
 
 ```yaml
 version: 2.1
@@ -416,6 +417,24 @@ workflows:
           post-steps:
             - store_test_results:
                 path: cypress/results
+```
+
+## skip-test-reports
+
+
+You can skip producing and uploading test reports. This is useful if you have configured this yourself. 
+
+```yaml
+version: 2.1
+orbs:
+  cypress: cypress-io/cypress@1
+workflows:
+  build:
+    jobs:
+      - cypress/install:
+          install-test-reporter: false
+      - cypress/run:
+          test-reports: ''
 ```
 
 ## artifacts

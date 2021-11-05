@@ -122,7 +122,7 @@ In all cases, you are using `run` and `install` job definitions that Cypress pro
 - [print info](docs/examples.md#print-info) after install
 - [install extra tools](docs/examples.md#install-extra-tool)
 - [complete NPM module publishing example](docs/examples.md#private-npm-module)
-- [store test reports on Circle](docs/examples.md#store-test-reports)
+- [skip test reports for Circle (for example if you already configured this yourself)](docs/examples.md#skip-test-reports)
 - [store screenshots and videos on Circle](docs/examples.md#artifacts)
 - [store other folders as artifacts on Circle](docs/examples.md#any-artifacts)
 - [use your own custom command to run tests](docs/examples.md#custom-command)
